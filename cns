@@ -19,12 +19,14 @@ newvdw=[]
 for i in vdw_radii:
         count_0+=1
         newvdw.append(i)
-newvdw[40]=1.6
-newvdw[26]=1.6
+newvdw[40]=1.6 # Zr Vdw radii (not previously defined)
+newvdw[26]=1.6 # Fe VDW radii (not previously defined)
 # Step size says how much the scales for the vdw_radii will change if they need to.
 step_size=-0.01
 # Difference between changes in scales for more frequent element that has higher cn than 12
 difference=0.25
+
+coolbeans=9.99
 
 def cns(neiglist):
         cns=[]
