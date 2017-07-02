@@ -1,0 +1,117 @@
+#! /usr/bin/env python
+import sys
+import numpy as np
+import ase
+import random
+from ase.io import read,write
+from ase.data.vdw import vdw_radii
+from ase.atoms import *
+from ase.calculators.neighborlist import *
+
+# I added have comment out these lines because the way I have written the code this is no longer necesary.
+#if len(sys.argv)<1:
+#	print "Wrong!"
+#	sys.exit()
+
+# This is a list that you can use to create any number of compositions you want!
+Surface_Percent=np.arange(0,1.05,0.05) ## GENERATE EXACT RANGE YANNI DISCUSSED
+# This factor determines how many structures are generated at the given composition! 
+num=1
+# This is the name of the file you are reading the cns from!
+moleculename = "original_cns_final.xyz"
+
+count=0
+newvdw=[]
+for i in vdw_radii:
+	count+=1
+	newvdw.append(i)
+newvdw[40]=1.3
+newvdw[26]=1.6
+Outnames=[]
+
+# Read name and cns from only original.xyz file
+file1 = open(moleculename,'r')
+lines = file1.readlines()
+file1.close()
+count1=0
+# Construct bulk_list and surf_list to contain the indicies of the bulk and surface
+# Atoms, respectively
+surf_list=[]
+bulk_list=[]
+CNS_track=[]
+for line in lines:
+	if count1<=1:
+		count1+=1
+	else:
+		vals=line.split()
+		CN_i=float(vals[4])
+                CNS_track.append(CN_i)
+		w = count1-2
+		if CN_i<12:
+			surf_list.append(w)
+		else:
+			bulk_list.append(w)
+			CN_j_list=[]
+		count1+=1
+
+# Convert this list to numpy array
+cns_track=np.asarray(CNS_track)
+
+original=read(moleculename)
+atomicsymbols=original.get_atomic_numbers()
+numfes=len([x for x in atomicsymbols if x==26])
+total=len(atomicsymbols)
+total_list=range(total)
+indicies=range(total)
+sort_ind=[y for (x,y) in sorted(zip(CNS_track,indicies))] #sort interms of CN values
+# Convert this list to numpy array
+sort_cns=sorted(CNS_track)
+cns_track=np.asarray(sort_cns)
+
+
+outsymbol=original.get_chemical_symbols()
+# Define the total number of surface atoms
+num_surf_atoms=len(surf_list)
+
+for percentfes in Surface_Percent:
+    for n in range(1,num+1):
+	#fes_surf=random.sample(surf_list,int(percentfes*num_surf_atoms))
+	#fes_bulk=random.sample(bulk_list,numfes-int(percentfes*num_surf_atoms))
+	fes=sort_ind[-6569:]
+	outvect=np.ones(total)*78
+	outvect[[fes]]=26
+	trackpt=0
+	trackfe=0
+	for i in range(total):
+        	if outvect[i]==78.:
+            		outsymbol[i]='Pt'
+            		trackpt+=1
+        	else:
+            		outsymbol[i]='Fe'
+            		trackfe+=1
+	#print trackpt,trackfe ## FOR DEBUGGING
+        #Open outfile as %Fe Surface and Number of atoms
+        file2 = open('Fe_core_cns.xyz','w')
+        #####################################################
+        # ADD CODE CALCULATING CE FOR THIS STRUCTURE!
+        #
+        #
+        #
+        #
+        # Using only the outsymbol and cns_track variables
+        # WRITE OUT TO NEW .TXT file to work with in Excel
+        #####################################################
+        count_2 = 0
+        for line in lines:
+                if count_2 <= 1:
+                        file2.write(line)
+                        count_2+=1
+                else:
+                        vect = line.split()
+			j=count_2-2
+			vect[0]=outsymbol[j]
+			vect.append('\n')
+                        out = ' '.join(vect)
+                        file2.write(out)
+                        count_2+=1
+        file2.close()
