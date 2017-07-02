@@ -1,0 +1,122 @@
+#! /usr/bin/env python
+# Tool for finding generalized surface coordination numbers
+import ase 
+from ase.io import read,write
+from ase.data import vdw_radii,chemical_symbols
+from ase.atoms import *
+from ase.calculators.neighborlist import *
+import numpy as np
+import sys
+
+# CNS file generated for determining scales to vdw_radii for elements in bimetallic NPs and creating _cns.xyz files
+
+if len(sys.argv) <1:
+    print 'Error: Not enough arguments passed!'
+    sys.exit()
+
+count_0=0
+newvdw=[]
+for i in vdw_radii:
+        count_0+=1
+        newvdw.append(i)
+newvdw[40]=1.6 # Zr Vdw radii (not previously defined)
+newvdw[26]=1.6 # Fe VDW radii (not previously defined)
+# Step size says how much the scales for the vdw_radii will change if they need to.
+step_size=-0.01
+# Difference between changes in scales for more frequent element that has higher cn than 12
+difference=0.25
+
+coolbeans=9.99
+
+def cns(neiglist):
+        cns=[]
+	complete_nl=[] #include neighborlist of all atoms
+        for i in range(len(atoms1)):
+		neighs=neiglist.get_neighbors(i)
+		neighs=neighs[0].tolist()
+		neighs=[x for x in neighs if x != i]
+		#print neighs
+		cns.append(len(neighs))
+		complete_nl.append(neighs)
+		#print final_nl
+	return np.array(cns), np.array(complete_nl) #turn into an array
+
+for item in range(1,len(sys.argv)):
+        # Set a scaling so that the cns code will automatically adjust
+        # scale_1 assigned to the lower atomic number element
+        scale_1=1
+        # scale_2 assigned to higher atonic number element
+        scale_2=1
+        # outflag used to determine if a scale has been set for both elements that makes all cns < 12
+        outflag=0
+	nl=None
+	moleculename=sys.argv[item]
+	atoms1=read(moleculename)
+	atomic_numbers=atoms1.get_atomic_numbers()
+        # min and max anums determine the identify of the bimetallics
+        min_anum=min(atomic_numbers)
+        max_anum=max(atomic_numbers)
+        ####### New Section ###################
+        while outflag==0: # While used to continue loop until outflag is true
+	    cutoffs=[]
+            # Generate cutoffs by atomic_numbers
+	    for i in range(len(atomic_numbers)):
+                temp=atomic_numbers[i]
+                if temp==min_anum:
+	            cutoffs.append(scale_1*newvdw[temp])
+                else: 
+		    cutoffs.append(scale_2*newvdw[temp])
+            # update neighborlist and calculate new cns
+	    nl=NeighborList(cutoffs,bothways=True)
+	    nl.update(atoms1)
+	    cordns,final_nl=cns(nl) #final_nl = complete_nl
+            # countmin/max are counters for the number of atoms which have cns>12
+            countmin=0
+            countmax=0
+            for i in range(len(cordns)):
+                # Check if the cn of atom i is greater than 12
+                if cordns[i]>12:
+                    # Check element of atom i
+                    if atomic_numbers[i]==min_anum:
+                        countmin+=1
+                    else: countmax+=1
+            # check if any of the counters were incremented (i.e. if any atoms were CN>12)
+            if (countmax+countmin)>0:
+                # if any are, increment their scale by the the step_size, favor larger atomic number
+                if countmax>=countmin:
+                     scale_2+=step_size
+                     scale_1+=step_size*difference
+                else: 
+                     scale_1+=step_size
+                     scale_2+=step_size*difference
+                #scale_1+=step_size
+                #scale_2+=step_size
+            # set outflag=1 to exit while loop!
+            else: outflag=1 
+        ################################################
+        # Read and write out the _cns.xyz file
+	file1=open(moleculename,'r')
+	lines=file1.readlines()
+	file1.close()
+	outname=moleculename.replace(".xyz","",1)
+	file2=open('{}_cns.xyz'.format(outname),'w')
+	count=0
+	for line in lines:
+		if count==0:
+			file2.write(line)
+			count+=1
+		elif count==1:
+			file2.write('Average CN={} , Scale {} = {} , Scale {} = {} \n'.format(cordns.mean(), chemical_symbols[min_anum],scale_1,chemical_symbols[max_anum],scale_2))
+			count+=1
+		else:
+			vect=line.split()
+			a=float(cordns[count-2])
+			b=final_nl[count-2]
+			vect.append('{}'.format(a))
+			vect.append('{}\n'.format(b))
+			out=' '.join(vect)
+			file2.write(out)
+			count+=1
+	file2.close()
+        # Write out the scales 
+	print '{}  Scale {} = {},  Scale {} ={}, Avg CN= {}\n'.format(outname,chemical_symbols[min_anum],scale_1,chemical_symbols[max_anum],scale_2,cordns.mean())
