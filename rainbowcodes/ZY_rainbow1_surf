@@ -1,0 +1,173 @@
+#! /usr/bin/env python
+import sys
+import numpy as np
+import ase
+import random
+from ase.io import read,write
+from ase.data.vdw import vdw_radii
+from ase.atoms import *
+from ase.calculators.neighborlist import *
+
+# I added have comment out these lines because the way I have written the code this is no longer necesary.
+#if len(sys.argv)<1:
+#	print "Wrong!"
+#	sys.exit()
+
+# This is a list that you can use to create any number of compositions you want!
+Surface_Percent=np.arange(0,0.95,0.05) ## GENERATE EXACT RANGE YANNI DISCUSSED
+# This factor determines how many structures are generated at the given composition! 
+num=1
+# This is the name of the file you are reading the cns from!
+moleculename = "original_cns_final.xyz"
+
+bl_Fe=0.404494382
+bl_Pt=float(1-bl_Fe)
+CE_Fe_pure=-3.88865818751
+Ce_Pt_pure=-5.30601958295
+EE_extract=(0.2832*CE_Fe_pure)+(0.7168*Ce_Pt_pure) 
+
+
+count=0
+newvdw=[]
+for i in vdw_radii:
+	count+=1
+	newvdw.append(i)
+newvdw[40]=1.6
+newvdw[26]=1.6
+Outnames=[]
+
+# Read name and cns from only original.xyz file
+file1 = open(moleculename,'r')
+lines = file1.readlines()
+file1.close()
+count1=0
+# Construct bulk_list and surf_list to contain the indicies of the bulk and surface
+# Atoms, respectively
+surf_list=[]
+bulk_list=[]
+subsurf_list=[]
+CNS_track=[]
+neighborlist_track=[]
+for line in lines:
+	if count1<=1:
+		count1+=1
+	else:
+		vals=line.split()
+		CN_i=float(vals[4])
+                CNS_track.append(CN_i)
+		w = count1-2
+		vect=line.split("[") #split the line by [
+                nl_i_raw=vect[1][0:-2] #pick the numbers without ]
+                nl_i_raw_2=nl_i_raw.split(",") #split by ,
+                nl_i = [int(i) for i in nl_i_raw_2] #convert into integer
+		neighborlist_track.append(nl_i)
+		if CN_i<=9:
+			surf_list.append(w)
+		elif CN_i<12:
+			subsurf_list.append(w)
+		else:
+			bulk_list.append(w)
+			CN_j_list=[]
+		count1+=1
+# Convert this list to numpy array
+cns_track=np.asarray(CNS_track)
+
+original=read(moleculename)
+atomicsymbols=original.get_atomic_numbers()
+numfes=len([x for x in atomicsymbols if x==26])
+total=len(atomicsymbols)
+total_list=range(total)
+not_surf_list=subsurf_list+bulk_list
+
+outsymbol=original.get_chemical_symbols()
+# Define the total number of surface atoms
+num_surf_atoms=len(surf_list) #atoms in subsurface and bulk
+num_subsurf_atoms=len(subsurf_list)
+num_bulk_atoms=len(bulk_list)
+num_not_surf=len(not_surf_list)
+
+for percentfes in Surface_Percent:
+    ces_structs=[]
+    E_excess=[]
+    for n in range(1,num+1):
+	temp_BE=0
+	Fe_num_surf=int(percentfes*num_surf_atoms)
+	Fe_num_notsurf=numfes-Fe_num_surf
+	Fe_num_bulk=int(0.5*Fe_num_notsurf) #distribute Fe_not_surf equally to bulk and subsurface
+	Fe_num_subsurf=Fe_num_notsurf-Fe_num_bulk
+	fes_surf=random.sample(surf_list,Fe_num_surf)
+	fes_subsurf=random.sample(subsurf_list,Fe_num_subsurf)
+	fes_bulk=random.sample(bulk_list,Fe_num_bulk)
+	fes=fes_surf+fes_subsurf+fes_bulk
+	#print '{}'.format(len(fes))
+	outvect=np.ones(total)*78
+	outvect[[fes]]=26
+	trackpt=0
+	trackfe=0
+	for i in range(total):
+        	if outvect[i]==78.:
+            		outsymbol[i]='Pt'
+			Ecoh_i=-5.84
+			bl_i=bl_Pt
+			nl_i_0=neighborlist_track[i] #neiborlist of atom i
+			CN_i=cns_track[i] # CN of atom i
+			for j in nl_i_0:
+				CN_j=cns_track[j] #CN of atom j
+				if outvect[j]==78.:
+					Ecoh_j=-5.84
+					bl_j=bl_Pt
+				else:
+					Ecoh_j=-4.28
+					bl_j=bl_Fe
+				temp_BE+=(((Ecoh_i*(CN_i**0.5)/(12**0.5))/CN_i))*(bl_i/float(bl_i+bl_j))+((Ecoh_j*(CN_j**0.5)/(12**0.5))/CN_j)*(bl_j/float(bl_i+bl_j))
+            		trackpt+=1
+        	else:
+            		outsymbol[i]='Fe'
+			Ecoh_i=-4.28
+                        bl_i=bl_Fe
+                        nl_i_0=neighborlist_track[i] #neiborlist of atom i
+			CN_i=cns_track[i] 	
+                        for j in nl_i_0:
+				CN_j=cns_track[j]
+                                if outvect[j]==78.:
+                                        Ecoh_j=-5.84
+                                        bl_j=bl_Pt
+                                else:
+                                        Ecoh_j=-4.28
+                                        bl_j=bl_Fe
+                                temp_BE+=(((Ecoh_i*(CN_i**0.5)/(12**0.5))/CN_i))*(bl_i/float(bl_i+bl_j))+((Ecoh_j*(CN_j**0.5)/(12**0.5))/CN_j)*(bl_j/float(bl_i+bl_j))	
+            		trackfe+=1
+	#print trackpt,trackfe ## FOR DEBUGGING
+	ces_structs.append(temp_BE/total)
+	#print total
+	CE=temp_BE/total
+	E_e=(CE-EE_extract)*100
+	E_excess.append(E_e)
+        #Open outfile as %Fe Surface and Number of atoms
+        file2 = open('{}_{}_cns.xyz'.format(int(percentfes*100),n),'w')
+        count_2 = 0
+        for line in lines:
+                if count_2 == 0:
+                        file2.write(line)
+                        count_2+=1
+		elif count_2 == 1:
+                	file2.write('CE={} eV\n'.format(temp_BE/total))
+                	count_2+=1
+                else:
+                        vect = line.split()
+			j=count_2-2
+			vect[0]=outsymbol[j]
+			vect.append('\n')
+                        out = ' '.join(vect)
+                        file2.write(out)
+                        count_2+=1
+        file2.close()
+# Write out only the CEs for each of the generated structures
+    file3=open('{}_surf_CE.txt'.format(int(percentfes*100)),'w')
+    for j  in ces_structs:
+        file3.write('{}\n'.format(j))
+    file3.close()
+    file4=open('{}_ExcessE.txt'.format(int(percentfes*100)),'w')
+    for m in E_excess:
+        file4.write('{}\n'.format(m))
+    file4.close() 
