@@ -1,0 +1,63 @@
+#! /usr/bin/env python
+import sys
+import numpy as np
+import ase
+from ase.io import read,write
+
+
+if len(sys.argv)<1:
+	print "Wrong!"
+	sys.exit()
+
+Ecoh_Fe=-4.28
+Ecoh_Pt=-5.84
+bl_Fe=0.404494382
+bl_Pt=float(1-bl_Fe)
+
+for item in range(1,len(sys.argv)):
+	moleculename = sys.argv[item]
+	atoms1 = read(moleculename)
+	file1 = open(moleculename,'r')
+	lines = file1.readlines()
+	file1.close()
+	count=0
+	BE=0
+	for line in lines:
+		if count<=1:
+			count+=1
+		else:
+			vals=line.split()
+			CN_i=float(vals[4])
+			name_i=vals[0]
+			if name_i=='Fe':
+				Ecoh_i=float(Ecoh_Fe)
+				bl_i=float(bl_Fe) #bond energy contribution of atom i
+			elif name_i=='Pt':
+				Ecoh_i=float(Ecoh_Pt)
+				bl_i=float(bl_Pt)
+			i = count-2
+			#nl_i = nl.get_neighbors(i)[0]
+			vect=line.split("[") #split the line by [
+			nl_i_raw=vect[1][0:-3] #pick the numbers without ]
+			nl_i_raw_2=nl_i_raw.split(",") #split by ,
+			nl_i = [int(i) for i in nl_i_raw_2] #convert into integer
+			#print nl_i
+			for j in nl_i:
+				k=j+2
+				line_j=lines[k]
+				vals_j=line_j.split()
+				CN_j=float(vals_j[4])
+				name_j=vals_j[0]
+				if name_j=='Fe':
+					Ecoh_j=float(Ecoh_Fe)
+					bl_j=float(bl_Fe)
+				elif name_j=='Pt':
+					Ecoh_j=float(Ecoh_Pt)
+					bl_j=float(bl_Pt)
+
+				BE+=(((Ecoh_i*(CN_i**0.5)/(12**0.5))/CN_i))*(bl_i/float(bl_i+bl_j))+((Ecoh_j*(CN_j**0.5)/(12**0.5))/CN_j)*(bl_j/float(bl_i+bl_j))
+			count+=1
+				
+	print 'The CE = {} eV for the {} system'.format(BE/(count-2),moleculename)
+	print '{}'.format(count-2)
+file2=open('result.txt','w')

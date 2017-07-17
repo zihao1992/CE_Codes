@@ -1,0 +1,61 @@
+#! /usr/bin/env python
+import sys
+import numpy as np
+import ase
+from ase.io import read,write
+
+
+if len(sys.argv)<1:
+	print "Wrong!"
+	sys.exit()
+
+Ecoh_Cu=-3.5196
+Ecoh_Zr=-7.2453
+bl_Zr=0.5664
+bl_Cu=float(1-bl_Zr)
+
+for item in range(1,len(sys.argv)):
+	moleculename = sys.argv[item]
+	atoms1 = read(moleculename)
+	file1 = open(moleculename,'r')
+	lines = file1.readlines()
+	file1.close()
+	count=0
+	BE=0
+	for line in lines:
+		if count<=1:
+			count+=1
+		else:
+			vals=line.split()
+			CN_i=float(vals[4])
+			name_i=vals[0]
+			if name_i=='Cu':
+				Ecoh_i=float(Ecoh_Cu)
+				bl_i=float(bl_Cu) #bond energy contribution of atom i
+			elif name_i=='Zr':
+				Ecoh_i=float(Ecoh_Zr)
+				bl_i=float(bl_Zr)
+			i = count-2
+			#nl_i = nl.get_neighbors(i)[0]
+			vect=line.split("[") #split the line by [
+			nl_i_raw=vect[1][0:-2] #pick the numbers without ]
+			nl_i_raw_2=nl_i_raw.split(",") #split by ,
+			nl_i = [int(i) for i in nl_i_raw_2] #convert into integer
+			#print nl_i
+			for j in nl_i:
+				k=j+2
+				line_j=lines[k]
+				vals_j=line_j.split()
+				CN_j=float(vals_j[4])
+				name_j=vals_j[0]
+				if name_j=='Cu':
+					Ecoh_j=float(Ecoh_Cu)
+					bl_j=float(bl_Cu)
+				elif name_j=='Zr':
+					Ecoh_j=float(Ecoh_Zr)
+					bl_j=float(bl_Zr)
+
+				BE+=(((Ecoh_i*(CN_i**0.5)/(12**0.5))/CN_i))*(bl_i/float(bl_i+bl_j))+((Ecoh_j*(CN_j**0.5)/(12**0.5))/CN_j)*(bl_j/float(bl_i+bl_j))
+			count+=1
+				
+	print 'The CE = {} eV for the {} system'.format(BE/(count-2),moleculename)
