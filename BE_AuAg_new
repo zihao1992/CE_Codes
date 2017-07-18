@@ -3,9 +3,6 @@ import sys
 import numpy as np
 import ase
 from ase.io import read,write
-from ase.data.vdw import vdw_radii
-from ase.data import chemical_symbols
-from ase.calculators.neighborlist import NeighborList
 
 
 if len(sys.argv)<1:
@@ -17,33 +14,9 @@ Ecoh_Ag=-2.5814
 bl_Au=0.64
 bl_Ag=float(1-bl_Au)
 
-def read_scales(moleculename):
-	with open('{}'.format(moleculename),'r') as file1:
-	        for count,line in enumerate(file1):
-        		if count==1:
-				saveline=line
-				continue
-	splitted=saveline.split()
-        scale1=float(splitted[6])
-        scale2=float(splitted[11])
-	return scale1,scale2        
-# function that read the final_cns.xyz to find the scale1 and scale2
-
 for item in range(1,len(sys.argv)):
 	moleculename = sys.argv[item]
 	atoms1 = read(moleculename)
-	scale1,scale2=read_scales(moleculename)
-	# scale 1,2 equals to the result of function separatively
-        atomic_numbers=atoms1.get_atomic_numbers()
-        min_anum=min(atomic_numbers)
-	cutoffs=[]
-        for i in range(len(atomic_numbers)):
-		if atomic_numbers[i]==min_anum:
-	              cutoffs.append(scale1*vdw_radii[atomic_numbers[i]])
-	# Here's a Commnet
-		else: cutoffs.append(scale2*vdw_radii[atomic_numbers[i]])
-	nl = NeighborList(cutoffs,self_interaction=False,bothways=True)
-	nl.update(atoms1)
 	file1 = open(moleculename,'r')
 	lines = file1.readlines()
 	file1.close()
@@ -63,8 +36,12 @@ for item in range(1,len(sys.argv)):
 				Ecoh_i=float(Ecoh_Ag)
 				bl_i=float(bl_Ag)
 			i = count-2
-			nl_i = nl.get_neighbors(i)[0]
-			#print 'neighbors for atom {} is {}'.format(i,nl_i)
+			#nl_i = nl.get_neighbors(i)[0]
+			vect=line.split("[") #split the line by [
+			nl_i_raw=vect[1][0:-2] #pick the numbers without ]
+			nl_i_raw_2=nl_i_raw.split(",") #split by ,
+			nl_i = [int(i) for i in nl_i_raw_2] #convert into integer
+			#print nl_i
 			for j in nl_i:
 				k=j+2
 				line_j=lines[k]
@@ -81,4 +58,4 @@ for item in range(1,len(sys.argv)):
 				BE+=(((Ecoh_i*(CN_i**0.5)/(12**0.5))/CN_i))*(bl_i/float(bl_i+bl_j))+((Ecoh_j*(CN_j**0.5)/(12**0.5))/CN_j)*(bl_j/float(bl_i+bl_j))
 			count+=1
 				
-	print 'The CE = {} eV for the {} system'.format(BE/(count-2),moleculename)
+	print 'The CE = {} eV for the {} system'.format(BE/(count-1),moleculename)
