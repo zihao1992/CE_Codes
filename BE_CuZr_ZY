@@ -10,8 +10,8 @@ if len(sys.argv)<1:
 	sys.exit()
 
 Ecoh_Cu=-3.5196
-Ecoh_Zr=-7.2453
-bl_Zr=0.5664
+Ecoh_Zr=-7.1914
+bl_Zr=0.57
 bl_Cu=float(1-bl_Zr)
 
 for item in range(1,len(sys.argv)):
